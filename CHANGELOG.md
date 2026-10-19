@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+- First release on npm. npm and ClawHub now receive the same package from the Publish workflow.
+- The offline fallback model list is regenerated from the live catalog at release.
+
 ## 0.1.1
 
 - Image, video, and speech providers answer OpenClaw's awaited readiness check (`isConfiguredAsync`) on OpenClaw 2026.10.10 and newer, and the plugin no longer calls `isProviderApiKeyConfigured`, which OpenClaw retires after December 31, 2026.

@@ -1,6 +1,6 @@
 {
   "name": "@empiriolabs/openclaw-provider",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "EmpirioLabs AI provider plugin for OpenClaw: chat, image, video, speech, transcription, and embedding models from the EmpirioLabs AI catalog.",
   "license": "MIT",
   "type": "module",
