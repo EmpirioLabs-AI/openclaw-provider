@@ -1,0 +1,72 @@
+{
+  "id": "empiriolabs",
+  "name": "EmpirioLabs AI",
+  "description": "Chat, image, video, speech, transcription, and embedding models from the EmpirioLabs AI catalog.",
+  "categories": ["models"],
+  "activation": {
+    "onStartup": false
+  },
+  "enabledByDefault": true,
+  "providers": ["empiriolabs"],
+  "providerRequest": {
+    "providers": {
+      "empiriolabs": {
+        "family": "empiriolabs",
+        "openAICompletions": {
+          "supportsStreamingUsage": true
+        }
+      }
+    }
+  },
+  "modelCatalog": {
+    "discovery": {
+      "empiriolabs": "runtime"
+    }
+  },
+  "setup": {
+    "providers": [
+      {
+        "id": "empiriolabs",
+        "authMethods": ["api-key"],
+        "envVars": ["EMPIRIOLABS_API_KEY"]
+      }
+    ]
+  },
+  "providerAuthChoices": [
+    {
+      "provider": "empiriolabs",
+      "method": "api-key",
+      "choiceId": "empiriolabs-api-key",
+      "appGuidedSecret": true,
+      "choiceLabel": "EmpirioLabs AI API key",
+      "choiceHint": "Chat, image, video, speech, transcription, and embedding models",
+      "groupId": "empiriolabs",
+      "groupLabel": "EmpirioLabs AI",
+      "groupHint": "Chat, image, video, speech, transcription, and embedding models",
+      "optionKey": "empiriolabsApiKey",
+      "cliFlag": "--empiriolabs-api-key",
+      "cliOption": "--empiriolabs-api-key <key>",
+      "cliDescription": "EmpirioLabs AI API key"
+    }
+  ],
+  "contracts": {
+    "imageGenerationProviders": ["empiriolabs"],
+    "videoGenerationProviders": ["empiriolabs"],
+    "speechProviders": ["empiriolabs"],
+    "mediaUnderstandingProviders": ["empiriolabs"],
+    "embeddingProviders": ["empiriolabs"]
+  },
+  "mediaUnderstandingProviderMetadata": {
+    "empiriolabs": {
+      "capabilities": ["audio"],
+      "autoPriority": {
+        "audio": 50
+      }
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

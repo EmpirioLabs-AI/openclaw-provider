@@ -1,0 +1,82 @@
+{
+  "name": "@empiriolabs/openclaw-provider",
+  "version": "0.1.0",
+  "description": "EmpirioLabs AI provider plugin for OpenClaw: chat, image, video, speech, transcription, and embedding models from the EmpirioLabs AI catalog.",
+  "license": "MIT",
+  "type": "module",
+  "homepage": "https://empiriolabs.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EmpirioLabs-AI/openclaw-provider.git"
+  },
+  "bugs": {
+    "url": "https://github.com/EmpirioLabs-AI/openclaw-provider/issues"
+  },
+  "author": {
+    "name": "EmpirioLabs AI",
+    "email": "support@empiriolabs.ai",
+    "url": "https://empiriolabs.ai"
+  },
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "openclaw-provider",
+    "empiriolabs",
+    "llm",
+    "ai",
+    "image-generation",
+    "video-generation",
+    "text-to-speech",
+    "transcription",
+    "embeddings"
+  ],
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "assets/icon.png",
+    "openclaw.plugin.json",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:live": "vitest run --config vitest.live.config.ts",
+    "generate:fallback": "node scripts/generate-fallback.mjs",
+    "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.10.5"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "openclaw": "2026.10.5",
+    "typescript": "7.0.2",
+    "vitest": "4.1.12"
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "providers": [
+      "empiriolabs"
+    ],
+    "install": {
+      "npmSpec": "@empiriolabs/openclaw-provider",
+      "clawhubSpec": "clawhub:@empiriolabs/openclaw-provider",
+      "defaultChoice": "npm",
+      "minHostVersion": ">=2026.10.5"
+    },
+    "compat": {
+      "pluginApi": ">=2026.10.5"
+    },
+    "build": {
+      "openclawVersion": "2026.10.5"
+    }
+  }
+}
