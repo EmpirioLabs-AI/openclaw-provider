@@ -6,7 +6,7 @@ EmpirioLabs AI is a specialized AI inference and integration provider. It self-h
 
 ## Requirements
 
-- OpenClaw 2026.10.5 or newer. Run `openclaw update` on older versions.
+- OpenClaw 2026.9.33 or newer. Run `openclaw update` on older versions.
 - An EmpirioLabs AI API key. Create one at [platform.empiriolabs.ai/dashboard/api-keys](https://platform.empiriolabs.ai/dashboard/api-keys). Keys start with `sk-empiriolabs-`.
 
 ## Install
