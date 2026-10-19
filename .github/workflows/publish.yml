@@ -101,6 +101,10 @@ jobs:
           npm run typecheck
           npm test
 
+      - name: Check the packed plugin with the OpenClaw Plugin Inspector
+        # Fails on breakages, warnings, and deprecated Plugin SDK APIs.
+        run: npm run inspect
+
       - name: Pack
         id: pack
         run: |

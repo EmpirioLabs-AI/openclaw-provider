@@ -3,7 +3,7 @@
  * A generation that outlasts the API's wait window comes back as a job, which
  * is polled at `GET /v1/jobs/{job_id}`.
  */
-import { isApiKeyConfigured, requireApiKey, type ApiKeyResolver } from "../auth.js";
+import { requireApiKey, type ApiKeyResolver, type AvailabilityCheck } from "../auth.js";
 import {
   findParameter,
   findRow,
@@ -28,6 +28,7 @@ import {
   type PollJobOptions,
 } from "../http.js";
 import type {
+  EmpirioImageProvider,
   ImageGenerationProvider,
   ImageGenerationRequest,
   ImageGenerationResult,
@@ -41,6 +42,8 @@ const LABEL = `${PROVIDER_LABEL} image generation failed`;
 
 export type MediaProviderDeps = {
   resolveApiKey: ApiKeyResolver;
+  /** Awaited readiness check behind the providers' isConfiguredAsync hooks. */
+  isAvailable: AvailabilityCheck;
   fetchFn?: FetchFn;
   sleep?: PollJobOptions["sleep"];
   now?: PollJobOptions["now"];
@@ -210,7 +213,7 @@ async function runImageRequest(params: {
   return { result, jobId: first.job_id };
 }
 
-export function buildImageProvider(deps: MediaProviderDeps): ImageGenerationProvider {
+export function buildImageProvider(deps: MediaProviderDeps): EmpirioImageProvider {
   const currentRows = () => selectMediaModels(peekCatalog().rows).image;
   return {
     id: PROVIDER_ID,
@@ -225,8 +228,10 @@ export function buildImageProvider(deps: MediaProviderDeps): ImageGenerationProv
     get capabilities() {
       return buildImageCapabilities(currentRows());
     },
-    isConfigured: (ctx) =>
-      isApiKeyConfigured({
+    // OpenClaw 2026.10.10 and newer call this; older hosts check the provider's
+    // saved auth themselves when no readiness hook is present.
+    isConfiguredAsync: (ctx) =>
+      deps.isAvailable({
         ...(ctx.cfg ? { cfg: ctx.cfg } : {}),
         ...(ctx.agentDir ? { agentDir: ctx.agentDir } : {}),
       }),

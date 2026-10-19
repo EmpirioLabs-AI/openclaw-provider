@@ -18,6 +18,8 @@ import { buildImageProvider } from "../src/media/image.js";
 import { buildTextProvider } from "../src/provider.js";
 import type { ImageGenerationRequest } from "../src/types.js";
 
+const isAvailable = async () => true;
+
 const KEY = process.env.EMPIRIOLABS_API_KEY?.trim() ?? "";
 const LIVE = process.env.EMPIRIOLABS_LIVE_TEST === "1" && KEY.length > 0;
 const describeLive = LIVE ? describe : describe.skip;
@@ -148,7 +150,7 @@ describeLive("EmpirioLabs AI live smoke", () => {
     const snapshot = await loadCatalog();
     const model = pickDefault(selectMediaModels(snapshot.rows).image)?.id;
     expect(model).toBeTruthy();
-    const provider = buildImageProvider({ resolveApiKey: async () => KEY });
+    const provider = buildImageProvider({ isAvailable, resolveApiKey: async () => KEY });
     const result = await provider.generateImage({
       provider: "empiriolabs",
       model: model!,

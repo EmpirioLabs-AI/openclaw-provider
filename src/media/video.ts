@@ -3,7 +3,7 @@
  * job; the provider polls `GET /v1/jobs/{job_id}` until the video is ready and
  * returns its link.
  */
-import { isApiKeyConfigured, requireApiKey } from "../auth.js";
+import { requireApiKey } from "../auth.js";
 import {
   findParameter,
   findRow,
@@ -20,6 +20,7 @@ import { resolveBaseUrl } from "../config.js";
 import { PROVIDER_ID, PROVIDER_LABEL } from "../constants.js";
 import { extractOutputUrls, isJobEnvelope, pollJob, postJson } from "../http.js";
 import type {
+  EmpirioVideoProvider,
   VideoGenerationCapabilities,
   VideoGenerationProvider,
   VideoGenerationRequest,
@@ -188,7 +189,7 @@ export function buildVideoBody(
   return body;
 }
 
-export function buildVideoProvider(deps: MediaProviderDeps): VideoGenerationProvider {
+export function buildVideoProvider(deps: MediaProviderDeps): EmpirioVideoProvider {
   const currentRows = () => selectMediaModels(peekCatalog().rows).video;
   return {
     id: PROVIDER_ID,
@@ -204,8 +205,10 @@ export function buildVideoProvider(deps: MediaProviderDeps): VideoGenerationProv
     get catalogByModel() {
       return buildCatalogByModel(currentRows());
     },
-    isConfigured: (ctx) =>
-      isApiKeyConfigured({
+    // OpenClaw 2026.10.10 and newer call this; older hosts check the provider's
+    // saved auth themselves when no readiness hook is present.
+    isConfiguredAsync: (ctx) =>
+      deps.isAvailable({
         ...(ctx.cfg ? { cfg: ctx.cfg } : {}),
         ...(ctx.agentDir ? { agentDir: ctx.agentDir } : {}),
       }),

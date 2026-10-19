@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createApiKeyResolver, isApiKeyConfigured, readEnvApiKey } from "../src/auth.js";
+import { createApiKeyResolver, createAvailabilityCheck, hasConfiguredApiKey, readEnvApiKey } from "../src/auth.js";
 import { readConfiguredBaseUrl, resolveBaseUrl } from "../src/config.js";
 import { API } from "./helpers.js";
 
@@ -37,9 +37,68 @@ describe("API key resolution", () => {
     expect(await resolver({})).toBeUndefined();
     expect(readEnvApiKey({ EMPIRIOLABS_API_KEY: "  " })).toBeUndefined();
   });
+});
 
-  it("reports readiness from the environment", () => {
-    expect(isApiKeyConfigured({}, { EMPIRIOLABS_API_KEY: "sk-env" })).toBe(true);
+describe("readiness", () => {
+  const profileConfig = { auth: { profiles: { "empiriolabs:default": { provider: "empiriolabs", mode: "api_key" } } } } as never;
+
+  it("reads configuration only for the synchronous check", () => {
+    expect(hasConfiguredApiKey({}, { EMPIRIOLABS_API_KEY: "sk-env" })).toBe(true);
+    expect(hasConfiguredApiKey(profileConfig, {})).toBe(true);
+    expect(hasConfiguredApiKey({ models: { providers: { EmpirioLabs: { baseUrl: API, models: [], apiKey: "sk-config" } } } } as never, {})).toBe(true);
+    expect(
+      hasConfiguredApiKey(
+        { models: { providers: { empiriolabs: { baseUrl: API, models: [], apiKey: { source: "env", provider: "default", id: "EMPIRIOLABS_API_KEY" } } } } } as never,
+        {},
+      ),
+    ).toBe(true);
+    expect(hasConfiguredApiKey({ auth: { profiles: { "openai:default": { provider: "openai", mode: "api_key" } } } } as never, {})).toBe(false);
+    expect(hasConfiguredApiKey(undefined, {})).toBe(false);
+  });
+
+  it("uses the host's awaited availability check when the host has one", async () => {
+    const calls: unknown[] = [];
+    const check = createAvailabilityCheck(
+      {
+        config: {},
+        runtime: {
+          modelAuth: {
+            isProviderApiKeyConfiguredAsync: async (params: unknown) => {
+              calls.push(params);
+              return true;
+            },
+          },
+        } as never,
+      },
+      {},
+    );
+    expect(await check({ agentDir: "/agents/main" })).toBe(true);
+    expect(calls).toEqual([{ provider: "empiriolabs", cfg: {}, agentDir: "/agents/main" }]);
+  });
+
+  it("trusts a negative host answer unless the env var is set", async () => {
+    const host = {
+      config: profileConfig,
+      runtime: { modelAuth: { isProviderApiKeyConfiguredAsync: async () => false } } as never,
+    };
+    expect(await createAvailabilityCheck(host, {})({})).toBe(false);
+    expect(await createAvailabilityCheck(host, { EMPIRIOLABS_API_KEY: "sk-env" })({})).toBe(true);
+  });
+
+  it("falls back to configuration on hosts without the awaited check or when it fails", async () => {
+    expect(await createAvailabilityCheck({ config: profileConfig }, {})({})).toBe(true);
+    expect(await createAvailabilityCheck({ config: {} }, {})({})).toBe(false);
+    const failing = {
+      config: profileConfig,
+      runtime: {
+        modelAuth: {
+          isProviderApiKeyConfiguredAsync: async () => {
+            throw new Error("store unavailable");
+          },
+        },
+      } as never,
+    };
+    expect(await createAvailabilityCheck(failing, {})({})).toBe(true);
   });
 });
 

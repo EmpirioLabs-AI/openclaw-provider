@@ -14,6 +14,7 @@ import {
   json,
   noSleep,
   sequence,
+  isAvailable,
 } from "./helpers.js";
 
 beforeEach(() => clearCatalogCacheForTests());
@@ -30,7 +31,7 @@ describe("image generation", () => {
       ["POST", `${API}/images/generations`, () => json({ created: 1, data: [{ url: `${CDN}/out.png` }] })],
       ["GET", `${CDN}/out.png`, () => bytes(PNG_BYTES, "image/png")],
     ]);
-    const provider = buildImageProvider({ resolveApiKey, fetchFn, sleep: noSleep });
+    const provider = buildImageProvider({ resolveApiKey, isAvailable, fetchFn, sleep: noSleep });
     const result = await provider.generateImage(request({ aspectRatio: "16:9" }));
     expect(result.model).toBe("image-fast");
     expect(result.images).toEqual([{ buffer: PNG_BYTES, mimeType: "image/png", fileName: "image-1.png" }]);
@@ -55,7 +56,7 @@ describe("image generation", () => {
       ],
       ["GET", `${CDN}/late.png`, () => bytes(PNG_BYTES, "image/png")],
     ]);
-    const provider = buildImageProvider({ resolveApiKey, fetchFn, sleep: noSleep });
+    const provider = buildImageProvider({ resolveApiKey, isAvailable, fetchFn, sleep: noSleep });
     const result = await provider.generateImage(request({ model: "empiriolabs/image-fast" }));
     expect(result.images).toHaveLength(1);
     expect(result.metadata).toEqual({ urls: [`${CDN}/late.png`], jobIds: ["job_img"] });
@@ -67,7 +68,7 @@ describe("image generation", () => {
       ["GET", `${API}/models`, catalogResponse()],
       ["POST", `${API}/images/generations`, () => json({ data: [{ b64_json: PNG_BYTES.toString("base64") }] })],
     ]);
-    const provider = buildImageProvider({ resolveApiKey, fetchFn });
+    const provider = buildImageProvider({ resolveApiKey, isAvailable, fetchFn });
     const result = await provider.generateImage(request());
     expect(result.images[0]).toEqual({ buffer: PNG_BYTES, mimeType: "image/png", fileName: "image-1.png" });
   });
@@ -85,7 +86,7 @@ describe("image generation", () => {
       ],
       ["GET", /^https:\/\/media\.example\.com\//, () => bytes(PNG_BYTES, "image/png")],
     ]);
-    const provider = buildImageProvider({ resolveApiKey, fetchFn });
+    const provider = buildImageProvider({ resolveApiKey, isAvailable, fetchFn });
     const result = await provider.generateImage(request({ count: 3 }));
     expect(result.images).toHaveLength(3);
     const posts = calls.filter((call) => call.method === "POST").map((call) => (call.body as { num_images?: number }).num_images);
@@ -94,7 +95,7 @@ describe("image generation", () => {
 
   it("fails clearly without an API key, before any request", async () => {
     const { fetchFn, calls } = createFetch([]);
-    const provider = buildImageProvider({ resolveApiKey: async () => undefined, fetchFn });
+    const provider = buildImageProvider({ isAvailable, resolveApiKey: async () => undefined, fetchFn });
     await expect(provider.generateImage(request())).rejects.toThrow("EmpirioLabs AI API key missing");
     expect(calls).toHaveLength(0);
   });
@@ -104,12 +105,12 @@ describe("image generation", () => {
       ["GET", `${API}/models`, catalogResponse()],
       ["POST", `${API}/images/generations`, () => json({ error: { message: "Prompt was rejected by moderation" } }, 400)],
     ]);
-    const provider = buildImageProvider({ resolveApiKey, fetchFn });
+    const provider = buildImageProvider({ resolveApiKey, isAvailable, fetchFn });
     await expect(provider.generateImage(request())).rejects.toThrow("(HTTP 400): Prompt was rejected by moderation");
   });
 
   it("does not accept reference images", async () => {
-    const provider = buildImageProvider({ resolveApiKey });
+    const provider = buildImageProvider({ resolveApiKey, isAvailable });
     await expect(
       provider.generateImage(request({ inputImages: [{ buffer: PNG_BYTES, mimeType: "image/png" }] })),
     ).rejects.toThrow("text-to-image only");
@@ -136,9 +137,23 @@ describe("image request mapping", () => {
     expect(capabilities.geometry?.sizesByModel).toEqual({ "image-sized": ["1024x1024", "1536x1024"] });
   });
 
+  it("answers readiness through the awaited check only", async () => {
+    const seen: unknown[] = [];
+    const provider = buildImageProvider({
+      resolveApiKey,
+      isAvailable: async (request) => {
+        seen.push(request);
+        return false;
+      },
+    });
+    expect(provider).not.toHaveProperty("isConfigured");
+    expect(await provider.isConfiguredAsync!({ cfg: {}, agentDir: "/agents/main" })).toBe(false);
+    expect(seen).toEqual([{ cfg: {}, agentDir: "/agents/main" }]);
+  });
+
   it("lists live image models once the catalog is cached", async () => {
     const { fetchFn } = createFetch([["GET", `${API}/models`, catalogResponse()]]);
-    const provider = buildImageProvider({ resolveApiKey });
+    const provider = buildImageProvider({ resolveApiKey, isAvailable });
     await loadCatalog({ fetchFn });
     expect(provider.models).toEqual(["image-fast", "image-sized"]);
     expect(provider.defaultModel).toBe("image-fast");

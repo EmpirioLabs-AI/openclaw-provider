@@ -82,6 +82,9 @@ export const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 
 
 export const noSleep = async () => {};
 
+/** Readiness check stub for provider tests. */
+export const isAvailable = async () => true;
+
 const chatEndpoints = ["POST /v1/chat/completions", "POST /v1/responses", "POST /v1/messages"];
 
 export const CATALOG_ROWS: CatalogRow[] = [

@@ -3,7 +3,7 @@
  * the audio file (or inline base64, or a job for long requests); the provider
  * returns the audio bytes.
  */
-import { isApiKeyConfigured, requireApiKey } from "../auth.js";
+import { hasConfiguredApiKey, requireApiKey } from "../auth.js";
 import {
   findParameter,
   findRow,
@@ -25,7 +25,7 @@ import {
   pollJob,
   postJson,
 } from "../http.js";
-import type { SpeechProvider, SpeechSynthesisResult } from "../types.js";
+import type { EmpirioSpeechProvider, SpeechSynthesisResult } from "../types.js";
 import type { MediaProviderDeps } from "./image.js";
 import { matchOption, normalizeModelId } from "./shared.js";
 
@@ -76,9 +76,9 @@ function voiceCompatible(format: string): boolean {
   return ["opus", "ogg"].includes(format.toLowerCase());
 }
 
-export function buildSpeechProvider(deps: MediaProviderDeps): SpeechProvider {
+export function buildSpeechProvider(deps: MediaProviderDeps): EmpirioSpeechProvider {
   const currentRows = () => selectMediaModels(peekCatalog().rows).speech;
-  const provider: SpeechProvider = {
+  const provider: EmpirioSpeechProvider = {
     id: PROVIDER_ID,
     label: PROVIDER_LABEL,
     defaultTimeoutMs: DEFAULT_SPEECH_TIMEOUT_MS,
@@ -93,9 +93,14 @@ export function buildSpeechProvider(deps: MediaProviderDeps): SpeechProvider {
       const raw = asRecord(providers?.[PROVIDER_ID]) ?? asRecord(rawConfig[PROVIDER_ID]);
       return readSpeechSettings(raw);
     },
-    isConfigured: ({ cfg, providerConfig }) =>
+    // OpenClaw 2026.10.10 and newer call this awaited check.
+    isConfiguredAsync: async ({ cfg, providerConfig }) =>
       Boolean(readSpeechSettings(providerConfig).apiKey) ||
-      isApiKeyConfigured({ ...(cfg ? { cfg } : {}) }),
+      (await deps.isAvailable({ ...(cfg ? { cfg } : {}) })),
+    // Required by hosts before OpenClaw 2026.10.10, which call it synchronously.
+    // It reads configuration only (no credential store).
+    isConfigured: ({ cfg, providerConfig }) =>
+      Boolean(readSpeechSettings(providerConfig).apiKey) || hasConfiguredApiKey(cfg),
     listVoices: async (req) => {
       const settings = readSpeechSettings(req.providerConfig);
       const apiKey =

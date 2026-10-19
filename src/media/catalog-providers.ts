@@ -1,10 +1,17 @@
-/** Image and video model lists for OpenClaw's model pickers, read from the live catalog. */
+/**
+ * Model lists for OpenClaw's model pickers and listings (chat, image, and
+ * video), registered through `api.registerModelCatalogProvider`. The static
+ * rows come from the generated offline fallback and need no network; the live
+ * rows come from the public catalog once a key is configured.
+ */
 import {
   fallbackSnapshot,
+  isChatModel,
   isImageModel,
   isVideoModel,
   loadCatalog,
   pickDefault,
+  pickDefaultChatModel,
   type CatalogRow,
 } from "../catalog.js";
 import { resolveBaseUrl } from "../config.js";
@@ -13,13 +20,20 @@ import type { FetchFn } from "../http.js";
 import type { ModelCatalogProvider } from "../types.js";
 import { videoModelCapabilities } from "./video.js";
 
-type MediaKind = "image_generation" | "video_generation";
+export type CatalogKind = "text" | "image_generation" | "video_generation";
 type CatalogEntries = Awaited<ReturnType<NonNullable<ModelCatalogProvider["liveCatalog"]>>>;
 type CatalogEntry = NonNullable<CatalogEntries>[number];
 
-function toEntries(rows: readonly CatalogRow[], kind: MediaKind, source: "live" | "static"): CatalogEntry[] {
+function selectRows(rows: readonly CatalogRow[], kind: CatalogKind): { selected: CatalogRow[]; preferred?: string } {
+  if (kind === "text") {
+    return { selected: rows.filter(isChatModel), preferred: pickDefaultChatModel(rows)?.id };
+  }
   const selected = rows.filter(kind === "image_generation" ? isImageModel : isVideoModel);
-  const preferred = pickDefault(selected)?.id;
+  return { selected, preferred: pickDefault(selected)?.id };
+}
+
+function toEntries(rows: readonly CatalogRow[], kind: CatalogKind, source: "live" | "static"): CatalogEntry[] {
+  const { selected, preferred } = selectRows(rows, kind);
   return selected.map((row) => {
     const entry: Record<string, unknown> = {
       kind,
@@ -40,7 +54,7 @@ function toEntries(rows: readonly CatalogRow[], kind: MediaKind, source: "live" 
   });
 }
 
-export function buildMediaCatalogProvider(kind: MediaKind, deps: { fetchFn?: FetchFn } = {}): ModelCatalogProvider {
+export function buildModelCatalogProvider(kind: CatalogKind, deps: { fetchFn?: FetchFn } = {}): ModelCatalogProvider {
   return {
     provider: PROVIDER_ID,
     kinds: [kind],

@@ -101,6 +101,7 @@ npm install
 npm run build              # compile to dist/
 npm run typecheck
 npm test                   # unit tests with mocked HTTP
+npm run inspect            # OpenClaw Plugin Inspector on the packed files (after a build)
 npm run generate:fallback  # refresh the offline fallback from the live catalog (after a build)
 npm pack --dry-run
 ```

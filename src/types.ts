@@ -50,3 +50,18 @@ export type EmbeddingProviderCreateOptions = Parameters<EmbeddingProviderAdapter
 export type ModelCatalogProvider = Parameters<OpenClawPluginApi["registerModelCatalogProvider"]>[0];
 
 export type OpenClawConfig = OpenClawPluginApi["config"];
+
+/** Context OpenClaw passes to image and video readiness hooks. */
+export type MediaReadinessContext = { cfg?: OpenClawConfig; agentDir?: string };
+export type SpeechReadinessContext = Parameters<SpeechProvider["isConfigured"]>[0];
+
+/**
+ * The awaited readiness hook. OpenClaw 2026.10.10 and newer call
+ * `isConfiguredAsync` in place of the retired synchronous `isConfigured`; it is
+ * declared here because the oldest supported host's types predate it.
+ */
+export type AsyncReadiness<Context> = { isConfiguredAsync?: (ctx: Context) => Promise<boolean> };
+
+export type EmpirioImageProvider = ImageGenerationProvider & AsyncReadiness<MediaReadinessContext>;
+export type EmpirioVideoProvider = VideoGenerationProvider & AsyncReadiness<MediaReadinessContext>;
+export type EmpirioSpeechProvider = SpeechProvider & AsyncReadiness<SpeechReadinessContext>;

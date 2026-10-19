@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { clearCatalogCacheForTests, loadCatalog } from "../src/catalog.js";
 import { FALLBACK_CATALOG } from "../src/generated/fallback-catalog.js";
 import plugin from "../src/index.js";
+import { buildModelCatalogProvider } from "../src/media/catalog-providers.js";
 import { buildTextProvider, resolveFromSnapshot } from "../src/provider.js";
 import { API, CATALOG_ROWS, TEST_KEY, catalogResponse, createFakeApi, createFetch, json } from "./helpers.js";
 
@@ -30,8 +31,15 @@ describe("plugin entry", () => {
       expect(list).toHaveLength(1);
       expect((list[0] as { id: string }).id).toBe("empiriolabs");
     }
+    const [image, video, speech] = [registered.image[0], registered.video[0], registered.speech[0]] as Array<Record<string, unknown>>;
+    for (const capability of [image, video]) {
+      expect(typeof capability!.isConfiguredAsync).toBe("function");
+      expect(capability).not.toHaveProperty("isConfigured");
+    }
+    expect(typeof speech!.isConfiguredAsync).toBe("function");
+    expect(typeof speech!.isConfigured).toBe("function");
     const kinds = registered.catalogs.map((catalog) => (catalog as { kinds: string[] }).kinds[0]);
-    expect(kinds).toEqual(["image_generation", "video_generation"]);
+    expect(kinds).toEqual(["text", "image_generation", "video_generation"]);
   });
 
   it("offers an API key auth choice with the documented flag and env var", () => {
@@ -96,14 +104,19 @@ describe("text provider catalog", () => {
     expect(ids.every((id) => FALLBACK_CATALOG.rows.some((row) => row.id === id))).toBe(true);
   });
 
-  it("has a network-free static catalog built from the generated fallback", async () => {
-    const { fetchFn, calls } = createFetch([]);
-    const provider = buildTextProvider({ fetchFn });
-    const result = await provider.staticCatalog!.run(catalogContext());
-    const config = (result as { provider: { models: Array<{ id: string }>; apiKey?: string } }).provider;
-    expect(config.models.length).toBe(1);
-    expect(config.apiKey).toBeUndefined();
+  it("lists chat models for pickers through registerModelCatalogProvider, not the retired staticCatalog hook", async () => {
+    const { fetchFn, calls } = createFetch([["GET", `${API}/models`, catalogResponse()]]);
+    expect(buildTextProvider({ fetchFn })).not.toHaveProperty("staticCatalog");
+    const catalog = buildModelCatalogProvider("text", { fetchFn });
+    const offline = await catalog.staticCatalog!({} as never);
+    expect(offline?.length).toBe(1);
+    expect(offline?.[0]).toMatchObject({ kind: "text", provider: "empiriolabs", source: "static", default: true });
     expect(calls).toHaveLength(0);
+    const live = await catalog.liveCatalog!({ config: {}, env: {}, resolveProviderApiKey: () => ({ apiKey: TEST_KEY }) } as never);
+    expect(live?.map((entry) => [entry.model, entry.default ?? false])).toEqual([
+      ["chat-pro", true],
+      ["chat-lite", false],
+    ]);
   });
 });
 

@@ -60,11 +60,6 @@ function buildProviderConfig(snapshot: CatalogSnapshot, baseUrl: string): ModelP
   } as ModelProviderConfig;
 }
 
-/** Network-free provider config built from the generated fallback. */
-export function buildStaticProviderConfig(): ModelProviderConfig {
-  return buildProviderConfig(fallbackSnapshot(), DEFAULT_BASE_URL);
-}
-
 function servesProvider(ctx: ProviderCatalogContext): boolean {
   const ids = ctx.providerIds;
   return !ids || ids.some((id) => id.trim().toLowerCase() === PROVIDER_ID);
@@ -173,6 +168,9 @@ export function buildTextProvider(deps: TextProviderDeps = {}): ProviderPlugin {
     label: PROVIDER_LABEL,
     envVars: [API_KEY_ENV_VAR],
     auth: [buildAuthMethod(deps)],
+    // The SDK keeps `catalog` as the text runtime source until its unified
+    // loader replaces it; listing and picker rows are registered separately
+    // through api.registerModelCatalogProvider (see media/catalog-providers.ts).
     catalog: {
       order: "simple",
       run: async (ctx): Promise<ProviderCatalogResult> => {
@@ -191,10 +189,6 @@ export function buildTextProvider(deps: TextProviderDeps = {}): ProviderPlugin {
         });
         return { provider: { ...buildProviderConfig(snapshot, baseUrl), apiKey } };
       },
-    },
-    staticCatalog: {
-      order: "simple",
-      run: async () => ({ provider: buildStaticProviderConfig() }),
     },
     resolveDynamicModel: (ctx) => {
       const baseUrl = dynamicBaseUrl(ctx);

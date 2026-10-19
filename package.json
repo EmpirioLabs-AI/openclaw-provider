@@ -1,6 +1,6 @@
 {
   "name": "@empiriolabs/openclaw-provider",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "EmpirioLabs AI provider plugin for OpenClaw: chat, image, video, speech, transcription, and embedding models from the EmpirioLabs AI catalog.",
   "license": "MIT",
   "type": "module",
@@ -47,6 +47,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:live": "vitest run --config vitest.live.config.ts",
+    "inspect": "node scripts/inspect.mjs",
     "generate:fallback": "node scripts/generate-fallback.mjs",
     "prepack": "npm run build"
   },
@@ -54,6 +55,7 @@
     "openclaw": ">=2026.9.33"
   },
   "devDependencies": {
+    "@openclaw/plugin-inspector": "0.4.3",
     "@types/node": "24.19.2",
     "openclaw": "2026.10.5",
     "typescript": "7.0.2",

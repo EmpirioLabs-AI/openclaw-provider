@@ -3,7 +3,7 @@ import { clearCatalogCacheForTests, loadCatalog } from "../src/catalog.js";
 import { buildSpeechProvider } from "../src/media/speech.js";
 import { buildTranscriptionProvider, transcribe } from "../src/media/transcription.js";
 import type { AudioTranscriptionRequest, SpeechSynthesisRequest } from "../src/types.js";
-import { API, CDN, TEST_KEY, bytes, catalogResponse, createFetch, json, noSleep, sequence } from "./helpers.js";
+import { API, CDN, TEST_KEY, bytes, catalogResponse, createFetch, json, noSleep, sequence, isAvailable } from "./helpers.js";
 
 beforeEach(() => clearCatalogCacheForTests());
 
@@ -19,7 +19,7 @@ describe("text to speech", () => {
       ["POST", `${API}/audio/speech`, () => json({ data: [{ url: `${CDN}/speech.mp3`, duration: 1.2, format: "mp3" }] })],
       ["GET", `${CDN}/speech.mp3`, () => bytes("ID3audio", "audio/mpeg")],
     ]);
-    const provider = buildSpeechProvider({ resolveApiKey, fetchFn });
+    const provider = buildSpeechProvider({ resolveApiKey, isAvailable, fetchFn });
     const result = await provider.synthesize(speechRequest());
     expect(result).toEqual({
       audioBuffer: Buffer.from("ID3audio"),
@@ -37,7 +37,7 @@ describe("text to speech", () => {
       ["GET", `${API}/models`, catalogResponse()],
       ["POST", `${API}/audio/speech`, () => json({ data: [{ b64_json: Buffer.from("WAVE").toString("base64") }] })],
     ]);
-    const provider = buildSpeechProvider({ resolveApiKey, fetchFn });
+    const provider = buildSpeechProvider({ resolveApiKey, isAvailable, fetchFn });
     const config = provider.resolveConfig!({ cfg: {}, rawConfig: { providers: { empiriolabs: { voice: "Sarah", outputFormat: "wav" } } }, timeoutMs: 1 } as never);
     const result = await provider.synthesize(speechRequest({ providerConfig: config, providerOverrides: { voice: "Charon" } }));
     expect(result.audioBuffer.toString()).toBe("WAVE");
@@ -57,7 +57,7 @@ describe("text to speech", () => {
       ["GET", `${API}/jobs/job_tts`, () => json({ job_id: "job_tts", status: "completed", result: { data: [{ url: `${CDN}/long.mp3` }] } })],
       ["GET", `${CDN}/long.mp3`, () => bytes("ID3long", "audio/mpeg")],
     ]);
-    const provider = buildSpeechProvider({ resolveApiKey, fetchFn, sleep: noSleep });
+    const provider = buildSpeechProvider({ resolveApiKey, isAvailable, fetchFn, sleep: noSleep });
     expect((await provider.synthesize(speechRequest())).audioBuffer.toString()).toBe("ID3long");
   });
 
@@ -66,7 +66,7 @@ describe("text to speech", () => {
       ["GET", `${API}/models`, catalogResponse()],
       ["GET", `${API}/voices?model=voice-one`, () => json({ data: [{ id: "Sarah", name: "Sarah", gender: "female", language: "en-US" }, { nope: 1 }] })],
     ]);
-    const provider = buildSpeechProvider({ resolveApiKey, fetchFn });
+    const provider = buildSpeechProvider({ resolveApiKey, isAvailable, fetchFn });
     expect(await provider.listVoices!({ cfg: {} })).toEqual([{ id: "Sarah", name: "Sarah", gender: "female", locale: "en-US" }]);
     expect(calls.find((call) => call.url.includes("/voices"))!.headers.get("authorization")).toBe(`Bearer ${TEST_KEY}`);
   });
@@ -86,16 +86,37 @@ describe("text to speech", () => {
           }),
       ],
     ]);
-    const provider = buildSpeechProvider({ resolveApiKey, fetchFn });
+    const provider = buildSpeechProvider({ resolveApiKey, isAvailable, fetchFn });
     expect(await provider.listVoices!({ cfg: {} })).toEqual([
       { id: "Celeste", name: "Celeste", locale: "en", description: "Soft voice" },
       { id: "Yash" },
     ]);
   });
 
+  it("answers readiness from speech settings, the awaited check, or configuration", async () => {
+    let available = false;
+    const provider = buildSpeechProvider({ resolveApiKey, isAvailable: async () => available });
+    const context = (providerConfig: Record<string, unknown>, cfg: unknown = {}) => ({ cfg, providerConfig, timeoutMs: 1 }) as never;
+    expect(await provider.isConfiguredAsync!(context({}))).toBe(false);
+    expect(await provider.isConfiguredAsync!(context({ apiKey: "sk-speech" }))).toBe(true);
+    available = true;
+    expect(await provider.isConfiguredAsync!(context({}))).toBe(true);
+    // The synchronous hook that hosts before 2026.10.10 require reads configuration only.
+    const profileConfig = { auth: { profiles: { "empiriolabs:default": { provider: "empiriolabs", mode: "api_key" } } } };
+    const savedEnv = process.env.EMPIRIOLABS_API_KEY;
+    delete process.env.EMPIRIOLABS_API_KEY;
+    try {
+      expect(provider.isConfigured(context({}, {}))).toBe(false);
+      expect(provider.isConfigured(context({}, profileConfig))).toBe(true);
+      expect(provider.isConfigured(context({ apiKey: "sk-speech" }, {}))).toBe(true);
+    } finally {
+      if (savedEnv !== undefined) process.env.EMPIRIOLABS_API_KEY = savedEnv;
+    }
+  });
+
   it("lists live speech models once the catalog is cached", async () => {
     await loadCatalog({ fetchFn: createFetch([["GET", `${API}/models`, catalogResponse()]]).fetchFn });
-    const provider = buildSpeechProvider({ resolveApiKey });
+    const provider = buildSpeechProvider({ resolveApiKey, isAvailable });
     expect(provider.models).toEqual(["voice-one"]);
     expect(provider.defaultModel).toBe("voice-one");
   });
@@ -151,7 +172,7 @@ describe("transcription", () => {
 
   it("registers audio transcription with a catalog default model", async () => {
     await loadCatalog({ fetchFn: createFetch([["GET", `${API}/models`, catalogResponse()]]).fetchFn });
-    const provider = buildTranscriptionProvider({ resolveApiKey });
+    const provider = buildTranscriptionProvider({ resolveApiKey, isAvailable });
     expect(provider.capabilities).toEqual(["audio"]);
     expect(provider.defaultModels).toEqual({ audio: "stt-turbo" });
   });

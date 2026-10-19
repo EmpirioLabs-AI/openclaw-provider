@@ -3,12 +3,13 @@
  *
  * Registers the `empiriolabs` text provider (OpenAI-compatible chat
  * completions with the live model catalog) plus image generation, video
- * generation, text to speech, audio transcription, and embeddings.
+ * generation, text to speech, audio transcription, and embeddings, and the
+ * chat, image, and video model lists for OpenClaw's pickers.
  */
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
-import { createApiKeyResolver } from "./auth.js";
+import { createApiKeyResolver, createAvailabilityCheck } from "./auth.js";
 import { PROVIDER_ID, PROVIDER_LABEL } from "./constants.js";
-import { buildMediaCatalogProvider } from "./media/catalog-providers.js";
+import { buildModelCatalogProvider } from "./media/catalog-providers.js";
 import { buildEmbeddingAdapter } from "./media/embeddings.js";
 import { buildImageProvider } from "./media/image.js";
 import { buildSpeechProvider } from "./media/speech.js";
@@ -22,14 +23,18 @@ export default definePluginEntry({
   description:
     "Chat, image, video, speech, transcription, and embedding models from the EmpirioLabs AI catalog.",
   register(api) {
-    const deps = { resolveApiKey: createApiKeyResolver(api) };
+    const deps = {
+      resolveApiKey: createApiKeyResolver(api),
+      isAvailable: createAvailabilityCheck(api),
+    };
     api.registerProvider(buildTextProvider());
     api.registerImageGenerationProvider(buildImageProvider(deps));
     api.registerVideoGenerationProvider(buildVideoProvider(deps));
     api.registerSpeechProvider(buildSpeechProvider(deps));
     api.registerMediaUnderstandingProvider(buildTranscriptionProvider(deps));
     api.registerEmbeddingProvider(buildEmbeddingAdapter(deps));
-    api.registerModelCatalogProvider(buildMediaCatalogProvider("image_generation"));
-    api.registerModelCatalogProvider(buildMediaCatalogProvider("video_generation"));
+    api.registerModelCatalogProvider(buildModelCatalogProvider("text"));
+    api.registerModelCatalogProvider(buildModelCatalogProvider("image_generation"));
+    api.registerModelCatalogProvider(buildModelCatalogProvider("video_generation"));
   },
 });

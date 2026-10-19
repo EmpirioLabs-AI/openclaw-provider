@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { clearCatalogCacheForTests, loadCatalog } from "../src/catalog.js";
-import { buildMediaCatalogProvider } from "../src/media/catalog-providers.js";
+import { buildModelCatalogProvider } from "../src/media/catalog-providers.js";
 import { buildVideoBody, buildVideoProvider, videoModelCapabilities } from "../src/media/video.js";
 import type { VideoGenerationRequest } from "../src/types.js";
-import { API, CATALOG_ROWS, CDN, TEST_KEY, catalogResponse, createFetch, json, noSleep, sequence } from "./helpers.js";
+import { API, CATALOG_ROWS, CDN, TEST_KEY, catalogResponse, createFetch, json, noSleep, sequence, isAvailable } from "./helpers.js";
 
 beforeEach(() => clearCatalogCacheForTests());
 
@@ -26,7 +26,7 @@ describe("video generation", () => {
         ),
       ],
     ]);
-    const provider = buildVideoProvider({ resolveApiKey, fetchFn, sleep: noSleep });
+    const provider = buildVideoProvider({ resolveApiKey, isAvailable, fetchFn, sleep: noSleep });
     const result = await provider.generateVideo(
       request({ resolution: "1080P", aspectRatio: "9:16", durationSeconds: 20, audio: true }),
     );
@@ -52,7 +52,7 @@ describe("video generation", () => {
       ["POST", `${API}/videos/generations`, () => json({ job_id: "job_vid", status: "processing" })],
       ["GET", `${API}/jobs/job_vid`, () => json({ job_id: "job_vid", status: "failed", error: { message: "Content policy" } })],
     ]);
-    const provider = buildVideoProvider({ resolveApiKey, fetchFn, sleep: noSleep });
+    const provider = buildVideoProvider({ resolveApiKey, isAvailable, fetchFn, sleep: noSleep });
     await expect(provider.generateVideo(request())).rejects.toThrow("job job_vid failed: Content policy");
   });
 
@@ -89,8 +89,14 @@ describe("video generation", () => {
     });
   });
 
+  it("answers readiness through the awaited check only", async () => {
+    const provider = buildVideoProvider({ resolveApiKey, isAvailable: async () => true });
+    expect(provider).not.toHaveProperty("isConfigured");
+    expect(await provider.isConfiguredAsync!({ cfg: {} })).toBe(true);
+  });
+
   it("does not take video or audio inputs", async () => {
-    const provider = buildVideoProvider({ resolveApiKey });
+    const provider = buildVideoProvider({ resolveApiKey, isAvailable });
     await expect(provider.generateVideo(request({ inputVideos: [{ url: "https://example.com/v.mp4" }] }))).rejects.toThrow(
       "takes a prompt and an optional image",
     );
@@ -98,7 +104,7 @@ describe("video generation", () => {
 
   it("resolves model capabilities only for video models", async () => {
     const { fetchFn } = createFetch([["GET", `${API}/models`, catalogResponse()]]);
-    const provider = buildVideoProvider({ resolveApiKey, fetchFn });
+    const provider = buildVideoProvider({ resolveApiKey, isAvailable, fetchFn });
     expect(await provider.resolveModelCapabilities!({ provider: "empiriolabs", model: "empiriolabs/video-turbo", cfg: {} } as never)).toBeDefined();
     expect(await provider.resolveModelCapabilities!({ provider: "empiriolabs", model: "chat-pro", cfg: {} } as never)).toBeUndefined();
   });
@@ -108,8 +114,8 @@ describe("media model catalogs", () => {
   it("lists live image and video models once a key is configured", async () => {
     const { fetchFn } = createFetch([["GET", `${API}/models`, catalogResponse()]]);
     const ctx = { config: {}, env: {}, resolveProviderApiKey: () => ({ apiKey: TEST_KEY }) } as never;
-    const images = await buildMediaCatalogProvider("image_generation", { fetchFn }).liveCatalog!(ctx);
-    const videos = await buildMediaCatalogProvider("video_generation", { fetchFn }).liveCatalog!(ctx);
+    const images = await buildModelCatalogProvider("image_generation", { fetchFn }).liveCatalog!(ctx);
+    const videos = await buildModelCatalogProvider("video_generation", { fetchFn }).liveCatalog!(ctx);
     expect(images?.map((entry) => [entry.model, entry.default ?? false])).toEqual([
       ["image-fast", true],
       ["image-sized", false],
@@ -121,13 +127,13 @@ describe("media model catalogs", () => {
   it("returns nothing without a key", async () => {
     const { fetchFn, calls } = createFetch([]);
     const ctx = { config: {}, env: {}, resolveProviderApiKey: () => ({ apiKey: undefined }) } as never;
-    expect(await buildMediaCatalogProvider("image_generation", { fetchFn }).liveCatalog!(ctx)).toBeNull();
+    expect(await buildModelCatalogProvider("image_generation", { fetchFn }).liveCatalog!(ctx)).toBeNull();
     expect(calls).toHaveLength(0);
   });
 
   it("has a static catalog from the generated fallback", async () => {
     await loadCatalog({ fetchFn: createFetch([["GET", `${API}/models`, () => json({}, 500)]]).fetchFn });
-    const entries = await buildMediaCatalogProvider("video_generation").staticCatalog!({} as never);
+    const entries = await buildModelCatalogProvider("video_generation").staticCatalog!({} as never);
     expect(entries?.length).toBe(1);
     expect(entries?.[0]).toMatchObject({ source: "static", default: true });
   });
