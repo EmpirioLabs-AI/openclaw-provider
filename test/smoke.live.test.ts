@@ -77,12 +77,14 @@ describeLive("EmpirioLabs AI live smoke", () => {
     const model = await liveChatModel();
     const stream = streamSimple(
       runtimeModel(model) as never,
-      { messages: [{ role: "user", content: "Say hello in one word.", timestamp: Date.now() }] } as never,
+      { messages: [{ role: "user", content: "Count from one to five in words, separated by spaces.", timestamp: Date.now() }] } as never,
       { apiKey: KEY, maxTokens: 512, reasoning: "low" } as never,
     );
     let deltas = 0;
+    let events = 0;
     for await (const event of stream as AsyncIterable<{ type: string }>) {
-      if (event.type === "text_delta" || event.type === "thinking_delta") {
+      events += 1;
+      if (event.type === "text_delta") {
         deltas += 1;
       }
     }
@@ -96,10 +98,11 @@ describeLive("EmpirioLabs AI live smoke", () => {
       throw new Error(response.errorMessage || "live chat failed");
     }
     const text = response.content.filter((block) => block.type === "text").map((block) => block.text).join("");
-    log(`${model.id} streamed ${deltas} deltas: ${JSON.stringify(text.slice(0, 80))}`);
+    log(`${model.id} streamed ${events} events, ${deltas} text deltas: ${JSON.stringify(text.slice(0, 80))}`);
     spend.push({ step: `chat ${model.id}`, usd: response.usage?.cost?.total ?? 0 });
-    expect(deltas).toBeGreaterThan(1);
-    expect(text.trim().length).toBeGreaterThan(0);
+    expect(deltas).toBeGreaterThanOrEqual(1);
+    expect(events).toBeGreaterThan(deltas);
+    expect(text.toLowerCase()).toContain("five");
   }, 180_000);
 
   it("calls a tool through OpenClaw's transport", async () => {
