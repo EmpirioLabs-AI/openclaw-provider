@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.3
+
+- Published from the Publish workflow through npm trusted publishing (OpenID Connect), with no stored npm token.
+- The offline fallback model list is regenerated from the live catalog at release.
+
 ## 0.1.2
 
 - First release on npm. npm and ClawHub now receive the same package from the Publish workflow.

@@ -18,7 +18,7 @@ export const HOMEPAGE_URL = "https://empiriolabs.ai";
 
 export const PACKAGE_NAME = "@empiriolabs/openclaw-provider";
 /** Kept equal to package.json "version"; a unit test enforces it. */
-export const PACKAGE_VERSION = "0.1.2";
+export const PACKAGE_VERSION = "0.1.3";
 export const USER_AGENT = `${PACKAGE_NAME}/${PACKAGE_VERSION}`;
 
 /** Catalog `supported_endpoints` values this plugin calls. */
