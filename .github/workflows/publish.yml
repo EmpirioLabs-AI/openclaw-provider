@@ -7,36 +7,21 @@
 # fallback that ships is current. If the catalog cannot be reached, the release
 # fails instead of shipping a stale fallback.
 #
-# npm, with provenance. Authentication, in order of preference:
-#
-#   1. Trusted publishing (OIDC, no secret). On npmjs.com open the package, then
-#      Settings > Trusted publishing, and add a GitHub Actions publisher:
-#        Organization or user: EmpirioLabs-AI
-#        Repository:           openclaw-provider
-#        Workflow filename:    publish.yml
-#        Environment:          (leave empty)
-#      Trusted publishing needs npm 11.5.1 or later, which Node 24 includes.
-#
-#   2. An NPM_TOKEN repository secret: a granular npm access token that can
-#      publish this package (with "Bypass two-factor authentication"). npm only
-#      lets you add a trusted publisher to a package that already exists, so use
-#      the token for the first version, then add the trusted publisher, delete
-#      the secret, and revoke the token.
+# npm, with provenance, through trusted publishing only (OIDC, no secret). On
+# npmjs.com the package's trusted publisher is EmpirioLabs-AI /
+# openclaw-provider / publish.yml (environment empty); npm 11.5.1 or later,
+# which Node 24 includes. A tag push publishes to npm from the approval-gated
+# `npm` environment.
 #
 # ClawHub, through ClawHub's reusable package-publish workflow (pinned to a
-# release commit). The package scope @empiriolabs must match the ClawHub
-# publisher handle `empiriolabs`.
+# release commit), also through trusted publishing only: ClawHub's trusted
+# publisher for @empiriolabs/openclaw-provider is this repository and
+# publish.yml, and ClawHub accepts a secretless publish only from a
+# workflow_dispatch run. After the tag push, run this workflow on the tag
+# ("Run workflow", choose the tag) and approve the `clawhub` environment. The
+# package scope @empiriolabs matches the ClawHub publisher handle `empiriolabs`.
 #
-#   1. The first publish needs a CLAWHUB_TOKEN repository secret: a ClawHub API
-#      token for an account that can publish as `empiriolabs`.
-#   2. After the first publish, a package manager can enable trusted publishing:
-#        clawhub package trusted-publisher set @empiriolabs/openclaw-provider \
-#          --repository EmpirioLabs-AI/openclaw-provider --workflow-filename publish.yml
-#      ClawHub accepts secretless (OIDC) publishes only on workflow_dispatch;
-#      tag pushes still use CLAWHUB_TOKEN.
-#
-# The tag must equal the version in package.json. workflow_dispatch publishes
-# the version in package.json at the selected ref.
+# The tag must equal the version in package.json.
 
 name: Publish
 
@@ -125,8 +110,10 @@ jobs:
 
   npm:
     name: Publish to npm
+    if: github.event_name == 'push'
     needs: build
     runs-on: ubuntu-latest
+    environment: npm
     permissions:
       # Lets npm request an OIDC token for trusted publishing and the provenance signature.
       id-token: write
@@ -152,28 +139,34 @@ jobs:
           name: package-tgz
 
       - name: Publish with provenance
-        # Without an NPM_TOKEN secret, npm authenticates through trusted publishing.
-        run: |
-          if [ -n "$NPM_TOKEN" ]; then
-            npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
-          fi
-          npm publish "./$TARBALL" --access public --provenance
+        # npm authenticates through trusted publishing only (OIDC, no secret).
+        run: npm publish "./$TARBALL" --access public --provenance
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           TARBALL: ${{ needs.build.outputs.tarball }}
+
+  clawhub-approval:
+    name: Approve the ClawHub publish
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: clawhub
+    steps:
+      - name: Approved
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: echo "Publishing $VERSION to ClawHub"
 
   clawhub:
     name: Publish to ClawHub
-    needs: build
+    if: github.event_name == 'workflow_dispatch'
+    needs: [build, clawhub-approval]
     permissions:
       actions: read
       contents: read
-      id-token: write
+      id-token: write # ClawHub trusted publishing
     uses: openclaw/clawhub/.github/workflows/package-publish.yml@cacf5ec1b0ee3cb532ab4555a68c1db9e0c1aac7 # v0.24.0
     with:
       dry_run: false
       owner: empiriolabs
       package_artifact_name: package-tgz
       changelog: "See CHANGELOG.md for version ${{ needs.build.outputs.version }}."
-    secrets:
-      clawhub_token: ${{ secrets.CLAWHUB_TOKEN }}
