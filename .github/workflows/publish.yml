@@ -39,8 +39,38 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  clawhub-validate:
+    name: Validate with the ClawHub plugin inspector
+    # ClawHub's CLI comes from npx, so it runs in a job of its own that finishes
+    # before the build job starts: it never shares a machine with the tarball
+    # both registries receive.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install dependencies and build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Validate with the ClawHub plugin inspector
+        # npx resolves only releases at least 7 days old.
+        run: |
+          npm_config_before="$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)" \
+            npx --yes clawhub@0.23.3 package validate .
+
   build:
     name: Build and pack
+    needs: clawhub-validate
     runs-on: ubuntu-latest
     outputs:
       tarball: ${{ steps.pack.outputs.tarball }}
@@ -96,9 +126,6 @@ jobs:
           tarball="$(npm pack --silent)"
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
           tar -tzf "$tarball"
-
-      - name: Validate with the ClawHub plugin inspector
-        run: npx --yes clawhub@0.23.3 package validate .
 
       - name: Upload the package
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
