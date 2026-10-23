@@ -63,10 +63,7 @@ jobs:
           npm run build
 
       - name: Validate with the ClawHub plugin inspector
-        # npx resolves only releases at least 7 days old.
-        run: |
-          npm_config_before="$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)" \
-            npx --yes clawhub@0.23.3 package validate .
+        run: npx --yes clawhub@0.23.3 package validate .
 
   build:
     name: Build and pack
