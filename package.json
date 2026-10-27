@@ -57,7 +57,7 @@
   "devDependencies": {
     "@openclaw/plugin-inspector": "0.4.3",
     "@types/node": "24.19.2",
-    "openclaw": "2026.10.5",
+    "openclaw": "2026.10.7",
     "typescript": "7.0.2",
     "vitest": "4.1.12"
   },
