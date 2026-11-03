@@ -188,7 +188,7 @@ jobs:
       actions: read
       contents: read
       id-token: write # ClawHub trusted publishing
-    uses: openclaw/clawhub/.github/workflows/package-publish.yml@cacf5ec1b0ee3cb532ab4555a68c1db9e0c1aac7 # v0.24.0
+    uses: openclaw/clawhub/.github/workflows/package-publish.yml@0a3dfec7b2a0c6a2e47ae05422922dfc101f0dd9 # v0.25.0
     with:
       dry_run: false
       owner: empiriolabs
