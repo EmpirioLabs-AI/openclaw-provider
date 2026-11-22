@@ -61,6 +61,12 @@
     "typescript": "7.0.2",
     "vitest": "4.1.12"
   },
+  "overrides": {
+    "openclaw": {
+      "npm": "^12.2.3",
+      "undici": "^8.12.2"
+    }
+  },
   "openclaw": {
     "extensions": [
       "./dist/index.js"
